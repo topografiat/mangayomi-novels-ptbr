@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://bryaoi.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.0",
+    "version": "0.1.1",
     "pkgPath": "novel/src/pt/bryaoi.js",
     "notes": "Novels em português do BR Yaoi."
 }];
@@ -169,13 +169,28 @@ class DefaultExtension extends MProvider {
 
     async getHtmlContent(name, url) {
         const doc = await this.fetch(url);
-        for (const selector of [
+        
+        const selectors = [
             ".entry-content", ".reading-content", ".chapter-content",
-            ".post-content", "article .content", "article"
-        ]) {
+            ".post-content", "article .content", "article",
+            ".ep-content", ".reader-area", ".text-left", 
+            ".chapter-container", ".rd-container", "div[id*='chapter']"
+        ];
+
+        for (const selector of selectors) {
             const content = doc.selectFirst(selector);
             if (content && content.text.trim().length > 100) return content.outerHtml;
         }
+
+        const paragraphs = doc.select("p");
+        if (paragraphs.length > 5) {
+            let combinedHtml = "";
+            for (const p of paragraphs) {
+                combinedHtml += p.outerHtml;
+            }
+            if (combinedHtml.length > 100) return combinedHtml;
+        }
+
         throw new Error("Não foi possível localizar o texto do capítulo no BR Yaoi.");
     }
 
