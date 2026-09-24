@@ -13,16 +13,23 @@
     "appMinVerReq": "0.5.0"
   },
   {
-    "name": "BL Novels",
-    "id": 584216731,
-    "baseUrl": "https://blnovels.com",
-    "lang": "pt",
-    "typeSource": "single",
-    "isManga": false,
-    "itemType": 2,
-    "version": "0.1.0",
-    "pkgName": "blnovels",
-    "sourceCodeUrl": "https://raw.githubusercontent.com/topografiat/mangayomi-novels-ptbr/main/javascript/novel/src/pt/blnovels.js",
-    "appMinVerReq": "0.5.0"
-  }
-]
+  "name": "BL Novels",
+  "id": 584216731,
+  "baseUrl": "https://blnovels.com",
+  "lang": "pt",
+  "typeSource": "single",
+  "dateFormat": "",
+  "dateFormatLocale": "",
+  "isNsfw": false,
+  "hasCloudflare": false,
+  "sourceCodeUrl": "https://raw.githubusercontent.com/topografiat/mangayomi-novels-ptbr/main/javascript/novel/src/pt/blnovels.js",
+  "apiUrl": "",
+  "version": "0.1.0",
+  "isManga": false,
+  "itemType": 2,
+  "isFullData": false,
+  "appMinVerReq": "0.5.0",
+  "additionalParams": "",
+  "sourceCodeLanguage": 1,
+  "notes": ""
+}
