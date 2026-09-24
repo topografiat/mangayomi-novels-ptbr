@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://bryaoi.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.2",
+    "version": "0.1.3",
     "pkgPath": "novel/src/pt/bryaoi.js",
     "notes": "Novels em português do BR Yaoi."
 }];
@@ -35,12 +35,15 @@ class DefaultExtension extends MProvider {
     }
 
     imageUrl(element) {
+        if (!element) return "";
         const img = element.selectFirst("img");
-        if (!img) return "";
-        return this.absoluteUrl(
-            img.attr("data-src") || img.attr("data-lazy-src") ||
-            img.attr("data-original") || img.attr("src") || ""
-        );
+        if (img) {
+            const src = img.attr("data-src") || img.attr("data-lazy-src") || img.attr("data-original") || img.attr("src");
+            if (src && !src.includes("icon") && !src.includes("logo")) {
+                return this.absoluteUrl(src);
+            }
+        }
+        return "";
     }
 
     async getNovelList(page) {
@@ -144,13 +147,29 @@ class DefaultExtension extends MProvider {
             }
         }
 
+        let coverUrl = "";
+        const coverSelectors = [
+            ".summary_image img", ".post-thumbnail img", 
+            ".entry-content img", "article img", ".wp-post-image"
+        ];
+        for (const sel of coverSelectors) {
+            const imgEl = doc.selectFirst(sel);
+            if (imgEl) {
+                const src = imgEl.attr("data-src") || imgEl.attr("data-lazy-src") || imgEl.attr("src");
+                if (src && !src.includes("icon") && !src.includes("logo")) {
+                    coverUrl = this.absoluteUrl(src);
+                    break;
+                }
+            }
+        }
+
         const chapters = [];
         const seen = {};
         for (const a of doc.select("a")) {
             const href = a.attr("href") || "";
             const text = (a.text || "").replace(/\s+/g, " ").trim();
             const link = this.absoluteUrl(href);
-            if (!link.includes("/ler/") || !/cap[ií]tulo/i.test(text) && !/pr[óo]logo/i.test(text) && !/extra/i.test(text) || seen[link]) continue;
+            if (!link.includes("/ler/") || (!/cap[ií]tulo/i.test(text) && !/pr[óo]logo/i.test(text) && !/extra/i.test(text)) || seen[link]) continue;
             seen[link] = true;
             chapters.push({name: text, url: link, scanlator: "BR Yaoi"});
         }
@@ -158,7 +177,7 @@ class DefaultExtension extends MProvider {
         return {
             name,
             link: url,
-            imageUrl: this.imageUrl(doc),
+            imageUrl: coverUrl || this.imageUrl(doc),
             description,
             author: "",
             genre: ["Novel", "PT-BR"],
@@ -170,7 +189,6 @@ class DefaultExtension extends MProvider {
     async getHtmlContent(name, url) {
         const doc = await this.fetch(url);
         
-        // 1. Tenta buscar imagens (caso o capítulo seja renderizado por páginas de imagens)
         const imageSelectors = [
             ".reading-content img", ".chapter-content img", 
             ".entry-content img", "div.text-left img", 
@@ -191,7 +209,6 @@ class DefaultExtension extends MProvider {
             }
         }
 
-        // 2. Fallback: Tenta buscar blocos de texto caso seja um capítulo em texto corrido
         const selectors = [
             ".entry-content", ".reading-content", ".chapter-content",
             ".post-content", "article .content", "article",
