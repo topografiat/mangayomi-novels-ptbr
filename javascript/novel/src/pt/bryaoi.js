@@ -1,14 +1,14 @@
 const mangayomiSources = [{
-    "name": "BR Yaoi - Novels",
+    "name": "BL Novels",
     "lang": "pt",
-    "baseUrl": "https://bryaoi.com",
+    "baseUrl": "https://blnovels.com",
     "apiUrl": "",
-    "iconUrl": "https://bryaoi.com/favicon.ico",
+    "iconUrl": "https://blnovels.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.4",
-    "pkgPath": "novel/src/pt/bryaoi.js",
-    "notes": "Novels em português do BR Yaoi."
+    "version": "0.1.0",
+    "pkgPath": "novel/src/pt/blnovels.js",
+    "notes": "Novels em português do BL Novels."
 }];
 
 class DefaultExtension extends MProvider {
@@ -30,64 +30,70 @@ class DefaultExtension extends MProvider {
 
     async fetch(url) {
         const res = await new Client().get(url, this.getHeaders(url));
-        if (res.statusCode !== 200) throw new Error("BR Yaoi retornou HTTP " + res.statusCode);
+        if (res.statusCode !== 200) {
+            throw new Error("BL Novels retornou HTTP " + res.statusCode);
+        }
         return new Document(res.body);
     }
 
     imageUrl(element) {
-        if (!element) return "";
         const img = element.selectFirst("img");
-        if (img) {
-            const src = img.attr("data-src") || img.attr("data-lazy-src") || img.attr("data-original") || img.attr("src");
-            if (src && !src.includes("icon") && !src.includes("logo")) {
-                return this.absoluteUrl(src);
-            }
-        }
-        return "";
+        if (!img) return "";
+        return this.absoluteUrl(
+            img.attr("data-src") || img.attr("data-lazy-src") ||
+            img.attr("data-original") || img.attr("src") || ""
+        );
+    }
+
+    cleanText(text) {
+        return (text || "").replace(/\s+/g, " ").trim();
+    }
+
+    isNovelUrl(link) {
+        return link.includes("/novel/") &&
+            !link.includes("/capitulo-") &&
+            !link.includes("/tag/") &&
+            !link.includes("/category/");
     }
 
     async getNovelList(page) {
         const n = page || 1;
         const url = n === 1
-            ? this.source.baseUrl + "/category/novel/"
-            : this.source.baseUrl + "/category/novel/page/" + n + "/";
+            ? this.source.baseUrl + "/novel-tag/novel/"
+            : this.source.baseUrl + "/novel-tag/novel/page/" + n + "/";
+
         const doc = await this.fetch(url);
         const list = [];
         const seen = {};
 
-        const selectors = [
-            "main article a", "article a", ".post a",
-            ".blog-post a", ".item-summary a", ".page-item-detail a"
-        ];
+        for (const a of doc.select("a")) {
+            const href = a.attr("href") || "";
+            const link = this.absoluteUrl(href);
+            const name = this.cleanText(a.text || "");
 
-        for (const selector of selectors) {
-            for (const a of doc.select(selector)) {
-                const href = a.attr("href") || "";
-                const name = (a.text || "").replace(/\s+/g, " ").trim();
-                const link = this.absoluteUrl(href);
-                if (!name || !link.includes("/yaoi/") || link.includes("/ler/") || seen[link]) continue;
-                seen[link] = true;
-                list.push({name, link, imageUrl: this.imageUrl(a)});
-            }
-        }
+            if (!name || !this.isNovelUrl(link) || seen[link]) continue;
 
-        if (list.length === 0) {
-            for (const a of doc.select("a")) {
-                const href = a.attr("href") || "";
-                const name = (a.text || "").replace(/\s+/g, " ").trim();
-                const link = this.absoluteUrl(href);
-                if (!name || !link.includes("/yaoi/") || link.includes("/ler/") || seen[link]) continue;
-                seen[link] = true;
-                list.push({name, link, imageUrl: this.imageUrl(a)});
-            }
+            // Ignora links de capítulos e links sem título útil.
+            if (/^cap[ií]tulo\b/i.test(name) || /^extra\b/i.test(name)) continue;
+
+            seen[link] = true;
+            list.push({
+                name,
+                link,
+                imageUrl: this.imageUrl(a)
+            });
         }
 
         let hasNextPage = false;
         for (const a of doc.select("a")) {
-            const text = (a.text || "").replace(/\s+/g, " ").trim().toLowerCase();
             const href = a.attr("href") || "";
-            if (href.includes("/category/novel/page/" + (n + 1) + "/") ||
-                text === "»" || text.includes("próxima")) {
+            const text = this.cleanText(a.text || "").toLowerCase();
+
+            if (
+                href.includes("/novel-tag/novel/page/" + (n + 1) + "/") ||
+                text === "posts mais antigos" ||
+                text.includes("próxima")
+            ) {
                 hasNextPage = true;
                 break;
             }
@@ -109,84 +115,87 @@ class DefaultExtension extends MProvider {
     }
 
     async search(query, page, filters) {
-        const doc = await this.fetch(this.source.baseUrl + "/?s=" + encodeURIComponent(query));
+        const n = page || 1;
+        const url = this.source.baseUrl + "/?s=" + encodeURIComponent(query) +
+            (n > 1 ? "&paged=" + n : "");
+
+        const doc = await this.fetch(url);
         const list = [];
         const seen = {};
         const wanted = (query || "").toLowerCase().trim();
 
         for (const a of doc.select("a")) {
             const href = a.attr("href") || "";
-            const name = (a.text || "").replace(/\s+/g, " ").trim();
             const link = this.absoluteUrl(href);
-            if (!name || !link.includes("/yaoi/") || link.includes("/ler/")) continue;
+            const name = this.cleanText(a.text || "");
+
+            if (!name || !this.isNovelUrl(link) || seen[link]) continue;
             if (wanted && !name.toLowerCase().includes(wanted)) continue;
-            if (seen[link]) continue;
+
             seen[link] = true;
-            list.push({name, link, imageUrl: this.imageUrl(a)});
+            list.push({
+                name,
+                link,
+                imageUrl: this.imageUrl(a)
+            });
         }
 
-        const novels = list.filter(x => x.name.toLowerCase().includes("novel"));
-        return {list: novels.length ? novels : list, hasNextPage: false};
+        return {list, hasNextPage: false};
     }
 
     async getDetail(url) {
         const doc = await this.fetch(url);
+
         const h1 = doc.selectFirst("h1");
-        const name = h1 ? h1.text.replace(/\s+/g, " ").trim() : url;
+        const name = h1 ? this.cleanText(h1.text) : url;
 
         let description = "";
-        const meta = doc.selectFirst('meta[name="description"]');
-        if (meta) description = (meta.attr("content") || "").trim();
-        if (!description) {
-            for (const selector of [".sinopse", ".summary", ".description", ".entry-content p"]) {
-                const el = doc.selectFirst(selector);
-                if (el && el.text.trim().length > 30) {
-                    description = el.text.replace(/\s+/g, " ").trim();
+        for (const selector of [
+            ".summary_content",
+            ".summary",
+            ".description",
+            ".entry-content"
+        ]) {
+            const el = doc.selectFirst(selector);
+            if (el) {
+                const txt = this.cleanText(el.text || "");
+                if (txt.length > 40) {
+                    description = txt;
                     break;
-                }
-            }
-        }
-
-        // 1. Tenta pegar pela meta tag og:image (geralmente a capa oficial da página)
-        let coverUrl = "";
-        const ogImage = doc.selectFirst('meta[property="og:image"]');
-        if (ogImage) {
-            coverUrl = ogImage.attr("content") || "";
-        }
-
-        // 2. Se não achar, varre seletores comuns de imagem de capa em posts do WordPress
-        if (!coverUrl) {
-            const coverSelectors = [
-                ".summary_image img", ".post-thumbnail img", 
-                "div.entry-content img", "article img", ".wp-post-image", ".thumb img"
-            ];
-            for (const sel of coverSelectors) {
-                const imgEl = doc.selectFirst(sel);
-                if (imgEl) {
-                    const src = imgEl.attr("data-src") || imgEl.attr("data-lazy-src") || imgEl.attr("src");
-                    if (src && !src.includes("icon") && !src.includes("logo")) {
-                        coverUrl = this.absoluteUrl(src);
-                        break;
-                    }
                 }
             }
         }
 
         const chapters = [];
         const seen = {};
+
+        // O BL Novels coloca os capítulos dentro da própria página da novel.
         for (const a of doc.select("a")) {
             const href = a.attr("href") || "";
-            const text = (a.text || "").replace(/\s+/g, " ").trim();
             const link = this.absoluteUrl(href);
-            if (!link.includes("/ler/") || (!/cap[ií]tulo/i.test(text) && !/pr[óo]logo/i.test(text) && !/extra/i.test(text)) || seen[link]) continue;
+            const text = this.cleanText(a.text || "");
+
+            if (!link.includes("/novel/") ||
+                !/cap[ií]tulo|extra|pr[oó]logo|sinopse|aviso|in[ií]cio|gloss[aá]rio|personagens/i.test(text) ||
+                seen[link]) {
+                continue;
+            }
+
+            // Evita confundir a própria página da novel com um capítulo.
+            if (link === url) continue;
+
             seen[link] = true;
-            chapters.push({name: text, url: link, scanlator: "BR Yaoi"});
+            chapters.push({
+                name: text,
+                url: link,
+                scanlator: "BL Novels"
+            });
         }
 
         return {
             name,
             link: url,
-            imageUrl: coverUrl || this.imageUrl(doc),
+            imageUrl: this.imageUrl(doc),
             description,
             author: "",
             genre: ["Novel", "PT-BR"],
@@ -197,69 +206,64 @@ class DefaultExtension extends MProvider {
 
     async getHtmlContent(name, url) {
         const doc = await this.fetch(url);
-        
-        const imageSelectors = [
-            ".reading-content img", ".chapter-content img", 
-            ".entry-content img", "div.text-left img", 
-            ".read-container img", "article img", ".page-break img"
-        ];
 
-        let imagesHtml = "";
-        for (const selector of imageSelectors) {
-            const imgs = doc.select(selector);
-            if (imgs && imgs.length > 0) {
-                for (const img of imgs) {
-                    const src = img.attr("data-src") || img.attr("data-lazy-src") || img.attr("src");
-                    if (src && !src.includes("icon") && !src.includes("logo")) {
-                        imagesHtml += `<img src="${this.absoluteUrl(src)}"/><br>`;
-                    }
-                }
-                if (imagesHtml.length > 0) return imagesHtml;
-            }
-        }
-
-        const selectors = [
-            ".entry-content", ".reading-content", ".chapter-content",
-            ".post-content", "article .content", "article",
-            ".ep-content", ".reader-area", ".text-left", 
-            ".chapter-container", ".rd-container"
-        ];
-
-        for (const selector of selectors) {
+        for (const selector of [
+            ".reading-content",
+            ".chapter-content",
+            ".entry-content",
+            ".post-content",
+            "article .content",
+            "article"
+        ]) {
             const content = doc.selectFirst(selector);
-            if (content && content.text.trim().length > 100) return content.outerHtml;
-        }
-
-        const paragraphs = doc.select("p");
-        if (paragraphs.length > 5) {
-            let combinedHtml = "";
-            for (const p of paragraphs) {
-                combinedHtml += p.outerHtml;
+            if (content && (content.text || "").trim().length > 100) {
+                return content.outerHtml;
             }
-            if (combinedHtml.length > 100) return combinedHtml;
         }
 
-        throw new Error("Não foi possível localizar o conteúdo (texto ou imagens) neste capítulo.");
+        throw new Error(
+            "Não foi possível localizar o texto do capítulo no BL Novels."
+        );
     }
 
     async cleanHtmlContent(html) {
         const doc = new Document(html);
+
         for (const selector of [
-            ".sharedaddy", ".jp-relatedposts", ".post-navigation",
-            ".navigation", ".comments", ".comment-respond",
-            "script", "style", "noscript", "iframe"
+            ".sharedaddy",
+            ".jp-relatedposts",
+            ".post-navigation",
+            ".navigation",
+            ".comments",
+            ".comment-respond",
+            ".social-share",
+            ".code-block",
+            "script",
+            "style",
+            "noscript",
+            "iframe",
+            "form"
         ]) {
-            for (const el of doc.select(selector)) el.remove();
+            for (const el of doc.select(selector)) {
+                el.remove();
+            }
         }
-        const root = doc.selectFirst(".entry-content") || doc.selectFirst("article") || doc.selectFirst("body");
+
+        const root =
+            doc.selectFirst(".reading-content") ||
+            doc.selectFirst(".chapter-content") ||
+            doc.selectFirst(".entry-content") ||
+            doc.selectFirst("article") ||
+            doc.selectFirst("body");
+
         return root ? root.outerHtml : html;
     }
 
     getFilterList() {
-        throw new Error("getFilterList not implemented");
+        throw new Error("getFilterList not implemented.");
     }
 
     getSourcePreferences() {
-        throw new Error("getSourcePreferences not implemented");
+        throw new Error("getSourcePreferences not implemented.");
     }
 }
