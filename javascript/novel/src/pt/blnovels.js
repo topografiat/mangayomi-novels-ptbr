@@ -12,6 +12,7 @@ const mangayomiSources = [{
 }];
 
 class DefaultExtension extends MProvider {
+
     getHeaders(url) {
         return {
             "User-Agent": "Mozilla/5.0 (Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
@@ -22,31 +23,58 @@ class DefaultExtension extends MProvider {
 
     absoluteUrl(href) {
         if (!href) return "";
-        if (href.startsWith("http://") || href.startsWith("https://")) return href;
-        if (href.startsWith("//")) return "https:" + href;
-        if (href.startsWith("/")) return this.source.baseUrl + href;
+
+        if (href.startsWith("http://") ||
+            href.startsWith("https://")) {
+            return href;
+        }
+
+        if (href.startsWith("//")) {
+            return "https:" + href;
+        }
+
+        if (href.startsWith("/")) {
+            return this.source.baseUrl + href;
+        }
+
         return this.source.baseUrl + "/" + href;
     }
 
     async fetch(url) {
-        const res = await new Client().get(url, this.getHeaders(url));
+        const res = await new Client().get(
+            url,
+            this.getHeaders(url)
+        );
+
         if (res.statusCode !== 200) {
-            throw new Error("BL Novels retornou HTTP " + res.statusCode);
+            throw new Error(
+                "BL Novels retornou HTTP " + res.statusCode
+            );
         }
+
         return new Document(res.body);
     }
 
-    imageUrl(element) {
-        const img = element.selectFirst("img");
-        if (!img) return "";
-        return this.absoluteUrl(
-            img.attr("data-src") || img.attr("data-lazy-src") ||
-            img.attr("data-original") || img.attr("src") || ""
-        );
+    cleanText(text) {
+        return (text || "")
+            .replace(/\s+/g, " ")
+            .trim();
     }
 
-    cleanText(text) {
-        return (text || "").replace(/\s+/g, " ").trim();
+    imageUrl(element) {
+        if (!element) return "";
+
+        const img = element.selectFirst("img");
+
+        if (!img) return "";
+
+        return this.absoluteUrl(
+            img.attr("data-src") ||
+            img.attr("data-lazy-src") ||
+            img.attr("data-original") ||
+            img.attr("src") ||
+            ""
+        );
     }
 
     isNovelUrl(link) {
@@ -58,48 +86,65 @@ class DefaultExtension extends MProvider {
 
     async getNovelList(page) {
         const n = page || 1;
+
         const url = n === 1
-            ? this.source.baseUrl + "/novel-tag/novel/"
-            : this.source.baseUrl + "/novel-tag/novel/page/" + n + "/";
+            ? this.source.baseUrl + "/"
+            : this.source.baseUrl + "/page/" + n + "/";
 
         const doc = await this.fetch(url);
+
         const list = [];
         const seen = {};
 
         for (const a of doc.select("a")) {
+
             const href = a.attr("href") || "";
             const link = this.absoluteUrl(href);
             const name = this.cleanText(a.text || "");
 
-            if (!name || !this.isNovelUrl(link) || seen[link]) continue;
+            if (!name) continue;
+            if (!this.isNovelUrl(link)) continue;
+            if (seen[link]) continue;
 
-            // Ignora links de capítulos e links sem título útil.
-            if (/^cap[ií]tulo\b/i.test(name) || /^extra\b/i.test(name)) continue;
+            if (
+                /^cap[ií]tulo\b/i.test(name) ||
+                /^extra\b/i.test(name)
+            ) {
+                continue;
+            }
 
             seen[link] = true;
+
             list.push({
-                name,
-                link,
+                name: name,
+                link: link,
                 imageUrl: this.imageUrl(a)
             });
         }
 
         let hasNextPage = false;
+
         for (const a of doc.select("a")) {
+
             const href = a.attr("href") || "";
-            const text = this.cleanText(a.text || "").toLowerCase();
+            const text = this.cleanText(
+                a.text || ""
+            ).toLowerCase();
 
             if (
-                href.includes("/novel-tag/novel/page/" + (n + 1) + "/") ||
-                text === "posts mais antigos" ||
-                text.includes("próxima")
+                href.includes("/page/" + (n + 1) + "/") ||
+                text.includes("próxima") ||
+                text.includes("posts mais antigos")
             ) {
                 hasNextPage = true;
                 break;
             }
         }
 
-        return {list, hasNextPage};
+        return {
+            list: list,
+            hasNextPage: hasNextPage
+        };
     }
 
     async getPopular(page) {
@@ -115,76 +160,160 @@ class DefaultExtension extends MProvider {
     }
 
     async search(query, page, filters) {
+
         const n = page || 1;
-        const url = this.source.baseUrl + "/?s=" + encodeURIComponent(query) +
-            (n > 1 ? "&paged=" + n : "");
+
+        let url =
+            this.source.baseUrl +
+            "/?s=" +
+            encodeURIComponent(query);
+
+        if (n > 1) {
+            url += "&paged=" + n;
+        }
 
         const doc = await this.fetch(url);
+
         const list = [];
         const seen = {};
-        const wanted = (query || "").toLowerCase().trim();
 
         for (const a of doc.select("a")) {
+
             const href = a.attr("href") || "";
             const link = this.absoluteUrl(href);
             const name = this.cleanText(a.text || "");
 
-            if (!name || !this.isNovelUrl(link) || seen[link]) continue;
-            if (wanted && !name.toLowerCase().includes(wanted)) continue;
+            if (!name) continue;
+            if (!this.isNovelUrl(link)) continue;
+            if (seen[link]) continue;
 
             seen[link] = true;
+
             list.push({
-                name,
-                link,
+                name: name,
+                link: link,
                 imageUrl: this.imageUrl(a)
             });
         }
 
-        return {list, hasNextPage: false};
+        return {
+            list: list,
+            hasNextPage: false
+        };
     }
 
     async getDetail(url) {
+
         const doc = await this.fetch(url);
 
+        let name = "";
+
         const h1 = doc.selectFirst("h1");
-        const name = h1 ? this.cleanText(h1.text) : url;
+
+        if (h1) {
+            name = this.cleanText(h1.text);
+        }
+
+        if (!name) {
+            name = url;
+        }
 
         let description = "";
+
         for (const selector of [
             ".summary_content",
             ".summary",
             ".description",
-            ".entry-content"
+            ".entry-content",
+            "article"
         ]) {
+
             const el = doc.selectFirst(selector);
+
+            if (!el) continue;
+
+            const txt = this.cleanText(
+                el.text || ""
+            );
+
+            if (txt.length > 40) {
+                description = txt;
+                break;
+            }
+        }
+
+        let author = "";
+
+        for (const selector of [
+            ".author-content",
+            ".author",
+            ".summary_content .author"
+        ]) {
+
+            const el = doc.selectFirst(selector);
+
             if (el) {
-                const txt = this.cleanText(el.text || "");
-                if (txt.length > 40) {
-                    description = txt;
-                    break;
-                }
+                author = this.cleanText(
+                    el.text || ""
+                );
+
+                if (author) break;
             }
         }
 
         const chapters = [];
         const seen = {};
 
-        // O BL Novels coloca os capítulos dentro da própria página da novel.
+        /*
+         * Os capítulos do BL Novels ficam
+         * dentro da própria página da novel.
+         */
+
         for (const a of doc.select("a")) {
+
             const href = a.attr("href") || "";
             const link = this.absoluteUrl(href);
             const text = this.cleanText(a.text || "");
 
-            if (!link.includes("/novel/") ||
-                !/cap[ií]tulo|extra|pr[oó]logo|sinopse|aviso|in[ií]cio|gloss[aá]rio|personagens/i.test(text) ||
-                seen[link]) {
+            if (!link) continue;
+
+            if (!link.includes("/novel/")) {
                 continue;
             }
 
-            // Evita confundir a própria página da novel com um capítulo.
-            if (link === url) continue;
+            if (link === url) {
+                continue;
+            }
+
+            if (seen[link]) {
+                continue;
+            }
+
+            /*
+             * Identifica capítulos, prólogo,
+             * extras e outros conteúdos de leitura.
+             */
+
+            if (
+                !/cap[ií]tulo|extra|pr[oó]logo|sinopse|aviso|in[ií]cio|gloss[aá]rio|personagens/i.test(text)
+            ) {
+                continue;
+            }
+
+            /*
+             * Não adiciona links que sejam
+             * páginas da própria novel.
+             */
+
+            if (
+                link.endsWith("/novel/") ||
+                link === url
+            ) {
+                continue;
+            }
 
             seen[link] = true;
+
             chapters.push({
                 name: text,
                 url: link,
@@ -192,20 +321,38 @@ class DefaultExtension extends MProvider {
             });
         }
 
+        /*
+         * O site apresenta os capítulos
+         * do mais recente para o mais antigo.
+         * Invertemos para leitura normal.
+         */
+
+        chapters.reverse();
+
         return {
-            name,
+            name: name,
             link: url,
             imageUrl: this.imageUrl(doc),
-            description,
-            author: "",
-            genre: ["Novel", "PT-BR"],
+            description: description,
+            author: author,
+            genre: [
+                "Novel",
+                "BL",
+                "PT-BR"
+            ],
             status: 1,
-            chapters: chapters.reverse()
+            chapters: chapters
         };
     }
 
     async getHtmlContent(name, url) {
+
         const doc = await this.fetch(url);
+
+        /*
+         * No BL Novels o texto do capítulo
+         * aparece diretamente na página.
+         */
 
         for (const selector of [
             ".reading-content",
@@ -215,9 +362,35 @@ class DefaultExtension extends MProvider {
             "article .content",
             "article"
         ]) {
+
             const content = doc.selectFirst(selector);
-            if (content && (content.text || "").trim().length > 100) {
+
+            if (!content) continue;
+
+            const text = (
+                content.text || ""
+            ).trim();
+
+            if (text.length > 100) {
                 return content.outerHtml;
+            }
+        }
+
+        /*
+         * Fallback para páginas em que
+         * o conteúdo esteja dentro do body.
+         */
+
+        const body = doc.selectFirst("body");
+
+        if (body) {
+
+            const text = (
+                body.text || ""
+            ).trim();
+
+            if (text.length > 100) {
+                return body.outerHtml;
             }
         }
 
@@ -227,6 +400,7 @@ class DefaultExtension extends MProvider {
     }
 
     async cleanHtmlContent(html) {
+
         const doc = new Document(html);
 
         for (const selector of [
@@ -244,6 +418,7 @@ class DefaultExtension extends MProvider {
             "iframe",
             "form"
         ]) {
+
             for (const el of doc.select(selector)) {
                 el.remove();
             }
@@ -253,17 +428,24 @@ class DefaultExtension extends MProvider {
             doc.selectFirst(".reading-content") ||
             doc.selectFirst(".chapter-content") ||
             doc.selectFirst(".entry-content") ||
+            doc.selectFirst(".post-content") ||
             doc.selectFirst("article") ||
             doc.selectFirst("body");
 
-        return root ? root.outerHtml : html;
+        return root
+            ? root.outerHtml
+            : html;
     }
 
     getFilterList() {
-        throw new Error("getFilterList not implemented.");
+        throw new Error(
+            "getFilterList not implemented."
+        );
     }
 
     getSourcePreferences() {
-        throw new Error("getSourcePreferences not implemented.");
+        throw new Error(
+            "getSourcePreferences not implemented."
+        );
     }
 }
