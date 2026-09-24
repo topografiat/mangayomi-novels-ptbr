@@ -1,27 +1,2 @@
 [{"name":"BR Yaoi - Novels","id":937421506,"baseUrl":"https://bryaoi.com","lang":"pt","typeSource":"single","iconUrl":"https://bryaoi.com/favicon.ico","dateFormat":"","dateFormatLocale":"","isNsfw":false,"hasCloudflare":false,"sourceCodeUrl":"https://raw.githubusercontent.com/topografiat/mangayomi-novels-ptbr/main/javascript/novel/src/pt/bryaoi.js","apiUrl":"","version":"0.1.0","isManga":false,"itemType":2,"isFullData":false,"appMinVerReq":"0.5.0","additionalParams":"","sourceCodeLanguage":1,"notes":"Novels PT-BR da categoria Novel do BR Yaoi."}]
 [
-  {
-    "name": "BR Yaoi - Novels",
-    "lang": "pt",
-    "baseUrl": "https://bryaoi.com",
-    "apiUrl": "",
-    "iconUrl": "https://bryaoi.com/favicon.ico",
-    "typeSource": "single",
-    "itemType": 2,
-    "version": "0.1.4",
-    "pkgPath": "novel/src/pt/bryaoi.js",
-    "notes": "Novels em português do BR Yaoi."
-  },
-  {
-    "name": "3X Yaoi - Novels",
-    "lang": "pt",
-    "baseUrl": "http://3xyaoi.com",
-    "apiUrl": "",
-    "iconUrl": "http://3xyaoi.com/favicon.ico",
-    "typeSource": "single",
-    "itemType": 2,
-    "version": "0.1.0",
-    "pkgPath": "novel/src/pt/3xyaoi.js",
-    "notes": "Novels em português do 3X Yaoi."
-  }
-]
