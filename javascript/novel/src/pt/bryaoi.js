@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://bryaoi.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.3",
+    "version": "0.1.4",
     "pkgPath": "novel/src/pt/bryaoi.js",
     "notes": "Novels em português do BR Yaoi."
 }];
@@ -147,18 +147,27 @@ class DefaultExtension extends MProvider {
             }
         }
 
+        // 1. Tenta pegar pela meta tag og:image (geralmente a capa oficial da página)
         let coverUrl = "";
-        const coverSelectors = [
-            ".summary_image img", ".post-thumbnail img", 
-            ".entry-content img", "article img", ".wp-post-image"
-        ];
-        for (const sel of coverSelectors) {
-            const imgEl = doc.selectFirst(sel);
-            if (imgEl) {
-                const src = imgEl.attr("data-src") || imgEl.attr("data-lazy-src") || imgEl.attr("src");
-                if (src && !src.includes("icon") && !src.includes("logo")) {
-                    coverUrl = this.absoluteUrl(src);
-                    break;
+        const ogImage = doc.selectFirst('meta[property="og:image"]');
+        if (ogImage) {
+            coverUrl = ogImage.attr("content") || "";
+        }
+
+        // 2. Se não achar, varre seletores comuns de imagem de capa em posts do WordPress
+        if (!coverUrl) {
+            const coverSelectors = [
+                ".summary_image img", ".post-thumbnail img", 
+                "div.entry-content img", "article img", ".wp-post-image", ".thumb img"
+            ];
+            for (const sel of coverSelectors) {
+                const imgEl = doc.selectFirst(sel);
+                if (imgEl) {
+                    const src = imgEl.attr("data-src") || imgEl.attr("data-lazy-src") || imgEl.attr("src");
+                    if (src && !src.includes("icon") && !src.includes("logo")) {
+                        coverUrl = this.absoluteUrl(src);
+                        break;
+                    }
                 }
             }
         }
