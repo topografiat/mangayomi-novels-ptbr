@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://bryaoi.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.5",
+    "version": "0.1.6",
     "pkgPath": "novel/src/pt/bryaoi.js",
     "notes": "Novels em português do BR Yaoi."
 }];
@@ -99,10 +99,11 @@ class DefaultExtension extends MProvider {
             return "";
         }
 
-        const last = parts[parts.length - 1];
+        const last =
+            parts[parts.length - 1];
 
-        const url = last
-            .split(/\s+/)[0];
+        const url =
+            last.split(/\s+/)[0];
 
         return this.absoluteUrl(url);
     }
@@ -118,9 +119,6 @@ class DefaultExtension extends MProvider {
             return "";
         }
 
-        /*
-         * Caso o próprio elemento seja uma imagem.
-         */
         const directSrc =
             element.attr("data-src") ||
             element.attr("data-lazy-src") ||
@@ -148,9 +146,6 @@ class DefaultExtension extends MProvider {
         }
 
 
-        /*
-         * Procura uma tag IMG dentro do elemento.
-         */
         const img =
             element.selectFirst("img");
 
@@ -183,9 +178,6 @@ class DefaultExtension extends MProvider {
             }
 
 
-            /*
-             * srcset / data-srcset.
-             */
             const srcset =
                 img.attr("srcset") ||
                 img.attr("data-srcset") ||
@@ -202,10 +194,6 @@ class DefaultExtension extends MProvider {
             }
 
 
-            /*
-             * Algumas páginas colocam a imagem
-             * como background-image.
-             */
             const style =
                 img.attr("style") || "";
 
@@ -225,7 +213,6 @@ class DefaultExtension extends MProvider {
             }
         }
 
-
         return "";
     }
 
@@ -241,9 +228,7 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * 1. Open Graph.
-         *
-         * Essa costuma ser a capa principal.
+         * Open Graph / Twitter.
          */
         for (const meta of doc.select("meta")) {
 
@@ -288,7 +273,7 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * 2. image_src.
+         * image_src.
          */
         for (const link of doc.select("link")) {
 
@@ -315,11 +300,9 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * 3. Seletores específicos de
-         * páginas WordPress.
+         * Seletores comuns de WordPress.
          */
         const selectors = [
-
             ".summary_image img",
             ".summary_image",
             ".post-thumbnail img",
@@ -355,8 +338,7 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * 4. Último recurso:
-         * procurar qualquer imagem útil.
+         * Último recurso.
          */
         for (const img of doc.select("img")) {
 
@@ -369,7 +351,6 @@ class DefaultExtension extends MProvider {
                 !image.includes("icon") &&
                 !image.includes("avatar")
             ) {
-
                 return image;
             }
         }
@@ -399,11 +380,14 @@ class DefaultExtension extends MProvider {
 
 
     /*
-     * Verifica se o link parece ser um capítulo.
+     * Verifica se o link é de capítulo.
      *
-     * Não dependemos mais somente da palavra
-     * "Capítulo", pois existem Side Story,
-     * Extras, Prólogo etc.
+     * Aceita qualquer link /ler/, incluindo:
+     * Capítulo
+     * Side Story
+     * Extra
+     * Prólogo
+     * etc.
      */
     isChapterLink(link, text) {
 
@@ -422,32 +406,17 @@ class DefaultExtension extends MProvider {
             return false;
         }
 
-        /*
-         * Tudo que estiver em /ler/ dentro
-         * da página da obra é tratado como
-         * possível capítulo.
-         *
-         * Isso permite:
-         * Capítulo 01
-         * Capítulo 01.5
-         * Capítulo Side Story 01
-         * Prólogo
-         * Extra
-         * etc.
-         */
-
         return true;
     }
 
 
     /*
-     * Extrai capítulos da página da obra.
+     * Extrai capítulos.
      */
     extractChapters(doc) {
 
         const chapters = [];
         const seen = {};
-
 
         for (const a of doc.select("a")) {
 
@@ -479,13 +448,7 @@ class DefaultExtension extends MProvider {
             }
 
 
-            /*
-             * Evita links estranhos que não
-             * sejam capítulos.
-             */
-            if (
-                text.length > 200
-            ) {
+            if (text.length > 200) {
                 continue;
             }
 
@@ -528,10 +491,6 @@ class DefaultExtension extends MProvider {
         const seen = {};
 
 
-        /*
-         * Primeiro tenta os locais mais
-         * comuns da listagem.
-         */
         const selectors = [
 
             "main article a",
@@ -573,24 +532,17 @@ class DefaultExtension extends MProvider {
                 seen[link] = true;
 
 
-                /*
-                 * Tenta a capa diretamente no
-                 * card/link.
-                 */
                 let image =
                     this.imageUrl(a);
 
 
-                /*
-                 * Se não encontrou, procura no
-                 * elemento pai.
-                 */
                 if (!image) {
 
                     const parent =
                         a.parent();
 
                     if (parent) {
+
                         image =
                             this.imageUrl(
                                 parent
@@ -651,7 +603,7 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * Detecta próxima página.
+         * Próxima página.
          */
         let hasNextPage =
             false;
@@ -725,7 +677,6 @@ class DefaultExtension extends MProvider {
         const n =
             page || 1;
 
-
         let url =
             this.source.baseUrl +
             "/?s=" +
@@ -787,6 +738,7 @@ class DefaultExtension extends MProvider {
                     a.parent();
 
                 if (parent) {
+
                     image =
                         this.imageUrl(
                             parent
@@ -810,6 +762,7 @@ class DefaultExtension extends MProvider {
         const novels =
             list.filter(
                 function(item) {
+
                     return item.name
                         .toLowerCase()
                         .includes("novel");
@@ -818,10 +771,12 @@ class DefaultExtension extends MProvider {
 
 
         return {
+
             list:
                 novels.length
                     ? novels
                     : list,
+
             hasNextPage:
                 false
         };
@@ -835,7 +790,7 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * Nome.
+         * NOME
          */
         const h1 =
             doc.selectFirst("h1");
@@ -850,66 +805,142 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * Descrição.
+         * ==================================================
+         * SINOPSE
+         * ==================================================
+         *
+         * O BR Yaoi coloca a sinopse no conteúdo da página
+         * depois de "SINOPSE:".
+         *
+         * Exemplo:
+         *
+         * SINOPSE:
+         * Texto da sinopse...
+         *
+         * Nome alternativo:
+         *
+         * A extração abaixo procura primeiro por uma
+         * ocorrência de "SINOPSE:" dentro de um parágrafo.
+         *
+         * Depois, caso "SINOPSE" esteja sozinho em um
+         * parágrafo, pega os parágrafos seguintes.
          */
-        let description =
-            "";
+
+        let description = "";
 
 
-        const metaDescription =
-            doc.selectFirst(
-                'meta[name="description"]'
-            );
+        const paragraphs =
+            doc.select("p");
 
 
-        if (metaDescription) {
+        /*
+         * PRIMEIRO MÉTODO:
+         *
+         * Procura "sinopse:" no próprio texto.
+         */
+        for (const p of paragraphs) {
 
-            description =
+            const text =
                 this.cleanText(
-                    metaDescription.attr(
-                        "content"
-                    ) || ""
+                    p.text || ""
                 );
+
+            if (!text) {
+                continue;
+            }
+
+
+            const lower =
+                text.toLowerCase();
+
+
+            const pos =
+                lower.indexOf(
+                    "sinopse:"
+                );
+
+
+            if (pos >= 0) {
+
+                const value =
+                    text.substring(
+                        pos +
+                        "sinopse:".length
+                    ).trim();
+
+
+                if (value.length > 30) {
+
+                    description =
+                        value;
+
+                    break;
+                }
+            }
         }
 
 
+        /*
+         * SEGUNDO MÉTODO:
+         *
+         * Caso "SINOPSE" esteja em um parágrafo
+         * separado, procura o próximo conteúdo.
+         */
         if (!description) {
 
-            const descriptionSelectors = [
-
-                ".sinopse",
-                ".summary",
-                ".description",
-                ".entry-content p",
-                ".post-content p"
-            ];
+            let foundSinopse =
+                false;
 
 
-            for (
-                const selector
-                of descriptionSelectors
-            ) {
+            for (const p of paragraphs) {
 
-                const el =
-                    doc.selectFirst(
-                        selector
+                const text =
+                    this.cleanText(
+                        p.text || ""
                     );
 
-
-                if (!el) {
+                if (!text) {
                     continue;
                 }
 
 
-                const text =
-                    this.cleanText(
-                        el.text || ""
-                    );
+                const lower =
+                    text.toLowerCase();
 
 
                 if (
-                    text.length > 30
+                    lower === "sinopse" ||
+                    lower === "sinopse:"
                 ) {
+
+                    foundSinopse = true;
+                    continue;
+                }
+
+
+                if (!foundSinopse) {
+                    continue;
+                }
+
+
+                /*
+                 * A sinopse termina antes
+                 * de "Nome alternativo".
+                 */
+                if (
+                    lower.indexOf(
+                        "nome alternativo"
+                    ) === 0
+                ) {
+                    break;
+                }
+
+
+                /*
+                 * Ignora textos muito pequenos,
+                 * como títulos ou separadores.
+                 */
+                if (text.length > 30) {
 
                     description =
                         text;
@@ -921,16 +952,121 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * CAPA
+         * TERCEIRO MÉTODO:
          *
-         * Agora usamos vários métodos.
+         * Algumas páginas podem ter a sinopse
+         * junto com outros elementos.
+         *
+         * Aqui procuramos qualquer elemento de
+         * texto que contenha "SINOPSE:".
          */
-        let coverUrl =
+        if (!description) {
+
+            const elements =
+                doc.select(
+                    "h1, h2, h3, h4, h5, h6, div, section"
+                );
+
+
+            for (const element of elements) {
+
+                const text =
+                    this.cleanText(
+                        element.text || ""
+                    );
+
+                if (!text) {
+                    continue;
+                }
+
+
+                const lower =
+                    text.toLowerCase();
+
+
+                const pos =
+                    lower.indexOf(
+                        "sinopse:"
+                    );
+
+
+                if (pos < 0) {
+                    continue;
+                }
+
+
+                let value =
+                    text.substring(
+                        pos +
+                        "sinopse:".length
+                    ).trim();
+
+
+                /*
+                 * Se o elemento também contém
+                 * "Nome alternativo", corta antes dele.
+                 */
+                const alternativePos =
+                    value.toLowerCase()
+                        .indexOf(
+                            "nome alternativo"
+                        );
+
+
+                if (alternativePos >= 0) {
+
+                    value =
+                        value.substring(
+                            0,
+                            alternativePos
+                        ).trim();
+                }
+
+
+                if (value.length > 30) {
+
+                    description =
+                        value;
+
+                    break;
+                }
+            }
+        }
+
+
+        /*
+         * ÚLTIMO RECURSO:
+         * meta description.
+         */
+        if (!description) {
+
+            const metaDescription =
+                doc.selectFirst(
+                    'meta[name="description"]'
+                );
+
+
+            if (metaDescription) {
+
+                description =
+                    this.cleanText(
+                        metaDescription.attr(
+                            "content"
+                        ) || ""
+                    );
+            }
+        }
+
+
+        /*
+         * CAPA
+         */
+        const coverUrl =
             this.getPageImage(doc);
 
 
         /*
-         * Autor.
+         * AUTOR
          */
         let author =
             "";
@@ -967,9 +1103,8 @@ class DefaultExtension extends MProvider {
         /*
          * CAPÍTULOS
          *
-         * Não limitamos mais por "Capítulo".
-         * Qualquer link /ler/ da página
-         * pode ser capítulo.
+         * Qualquer link /ler/ é considerado
+         * um possível capítulo.
          */
         let chapters =
             this.extractChapters(
@@ -978,9 +1113,7 @@ class DefaultExtension extends MProvider {
 
 
         /*
-         * Caso algum link de capítulo
-         * apareça duplicado em outro lugar,
-         * remove duplicados novamente.
+         * Remove duplicados.
          */
         const uniqueChapters = [];
         const chapterSeen = {};
@@ -1008,14 +1141,6 @@ class DefaultExtension extends MProvider {
         }
 
 
-        /*
-         * O BR Yaoi normalmente mostra
-         * o capítulo mais antigo primeiro
-         * na página.
-         *
-         * Mantemos a ordem encontrada,
-         * que é mais segura para novels.
-         */
         chapters =
             uniqueChapters;
 
@@ -1244,7 +1369,6 @@ class DefaultExtension extends MProvider {
         for (
             const selector
             of [
-
                 ".sharedaddy",
                 ".jp-relatedposts",
                 ".post-navigation",
