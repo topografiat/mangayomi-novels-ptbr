@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://blnovels.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.4",
+    "version": "0.1.5",
     "pkgPath": "novel/src/pt/blnovels.js",
     "notes": "Novels em português do BL Novels."
 }];
@@ -27,8 +27,10 @@ class DefaultExtension extends MProvider {
 
         url = url.trim();
 
-        if (url.indexOf("http://") === 0 ||
-            url.indexOf("https://") === 0) {
+        if (
+            url.indexOf("http://") === 0 ||
+            url.indexOf("https://") === 0
+        ) {
             return url;
         }
 
@@ -69,10 +71,42 @@ class DefaultExtension extends MProvider {
             .trim();
     }
 
-    getImage(element) {
+    isBadTitle(text) {
+        if (!text) return true;
+
+        const value =
+            this.cleanText(text).toLowerCase();
+
+        const badTitles = [
+            "concluído",
+            "concluido",
+            "em andamento",
+            "18+",
+            "18 +",
+            "novo",
+            "ler",
+            "ler do início",
+            "ler do inicio",
+            "último capítulo",
+            "ultimo capítulo",
+            "último capitulo",
+            "ultimo capitulo"
+        ];
+
+        for (let i = 0; i < badTitles.length; i++) {
+            if (value === badTitles[i]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    getImageFromElement(element) {
         if (!element) return "";
 
-        const img = element.selectFirst("img");
+        const img =
+            element.selectFirst("img");
 
         if (!img) return "";
 
@@ -93,16 +127,23 @@ class DefaultExtension extends MProvider {
         }
 
         if (!url) {
+            url = img.attr("data-image") || "";
+        }
+
+        if (!url) {
             url = img.attr("src") || "";
         }
 
         if (!url) return "";
 
-        const lower = url.toLowerCase();
+        const lower =
+            url.toLowerCase();
 
-        if (lower.indexOf("logo") >= 0 ||
+        if (
+            lower.indexOf("logo") >= 0 ||
             lower.indexOf("favicon") >= 0 ||
-            lower.indexOf("avatar") >= 0) {
+            lower.indexOf("avatar") >= 0
+        ) {
             return "";
         }
 
@@ -111,22 +152,50 @@ class DefaultExtension extends MProvider {
 
     getOpenGraphImage(doc) {
 
-        const meta = doc.selectFirst(
-            'meta[property="og:image"]'
-        );
+        const selectors = [
+            'meta[property="og:image"]',
+            'meta[property="og:image:url"]',
+            'meta[name="twitter:image"]'
+        ];
 
-        if (!meta) return "";
+        for (
+            let i = 0;
+            i < selectors.length;
+            i++
+        ) {
 
-        const value = meta.attr("content") || "";
+            const meta =
+                doc.selectFirst(
+                    selectors[i]
+                );
 
-        if (!value) return "";
+            if (!meta) continue;
 
-        return this.absoluteUrl(value);
+            const value =
+                meta.attr("content") || "";
+
+            if (!value) continue;
+
+            const lower =
+                value.toLowerCase();
+
+            if (
+                lower.indexOf("logo") >= 0 ||
+                lower.indexOf("favicon") >= 0
+            ) {
+                continue;
+            }
+
+            return this.absoluteUrl(value);
+        }
+
+        return "";
     }
 
-    getNovelImage(doc) {
+    getPageImage(doc) {
 
-        let image = this.getOpenGraphImage(doc);
+        let image =
+            this.getOpenGraphImage(doc);
 
         if (image) {
             return image;
@@ -138,36 +207,52 @@ class DefaultExtension extends MProvider {
             ".c-tabs-item__content img",
             ".page-item-detail img",
             ".item-summary img",
+            ".post-title img",
             "article img"
         ];
 
-        for (let i = 0; i < selectors.length; i++) {
+        for (
+            let i = 0;
+            i < selectors.length;
+            i++
+        ) {
 
-            const img = doc.selectFirst(
-                selectors[i]
-            );
+            const element =
+                doc.selectFirst(
+                    selectors[i]
+                );
 
-            if (!img) continue;
+            if (!element) continue;
 
             let url = "";
 
-            url = img.attr("data-src") || "";
+            url =
+                element.attr("data-src") || "";
 
             if (!url) {
-                url = img.attr("data-lazy-src") || "";
+                url =
+                    element.attr("data-lazy-src") || "";
             }
 
             if (!url) {
-                url = img.attr("data-original") || "";
+                url =
+                    element.attr("data-original") || "";
             }
 
             if (!url) {
-                url = img.attr("src") || "";
+                url =
+                    element.attr("data-original-src") || "";
+            }
+
+            if (!url) {
+                url =
+                    element.attr("src") || "";
             }
 
             if (!url) continue;
 
-            const lower = url.toLowerCase();
+            const lower =
+                url.toLowerCase();
 
             if (
                 lower.indexOf("logo") >= 0 ||
@@ -187,17 +272,29 @@ class DefaultExtension extends MProvider {
 
         if (!url) return false;
 
-        if (url.indexOf("/novel/") < 0) {
+        if (
+            url.indexOf(
+                this.source.baseUrl +
+                "/novel/"
+            ) !== 0
+        ) {
             return false;
         }
 
-        const part = url.split("/novel/")[1] || "";
+        const part =
+            url.substring(
+                (
+                    this.source.baseUrl +
+                    "/novel/"
+                ).length
+            );
 
-        const pieces = part
-            .split("/")
-            .filter(function(item) {
-                return item.trim() !== "";
-            });
+        const pieces =
+            part
+                .split("/")
+                .filter(function(item) {
+                    return item.trim() !== "";
+                });
 
         return pieces.length === 1;
     }
@@ -210,34 +307,109 @@ class DefaultExtension extends MProvider {
 
         let base = novelUrl;
 
-        if (base.charAt(base.length - 1) !== "/") {
+        if (
+            base.charAt(
+                base.length - 1
+            ) !== "/"
+        ) {
             base += "/";
         }
 
-        if (url.indexOf(base) !== 0) {
+        if (
+            url.indexOf(base) !== 0
+        ) {
             return false;
         }
 
-        const rest = url.substring(base.length);
+        const rest =
+            url.substring(
+                base.length
+            );
 
         if (!rest) {
             return false;
         }
 
-        const pieces = rest
-            .split("/")
-            .filter(function(item) {
-                return item.trim() !== "";
-            });
+        const pieces =
+            rest
+                .split("/")
+                .filter(function(item) {
+                    return item.trim() !== "";
+                });
 
         return pieces.length > 0;
     }
 
+    async getNovelInfo(url) {
+
+        try {
+
+            const doc =
+                await this.fetchDocument(url);
+
+            let name = "";
+
+            const h1 =
+                doc.selectFirst("h1");
+
+            if (h1) {
+                name =
+                    this.cleanText(
+                        h1.text || ""
+                    );
+            }
+
+            if (
+                !name ||
+                this.isBadTitle(name)
+            ) {
+
+                const title =
+                    doc.selectFirst(
+                        "title"
+                    );
+
+                if (title) {
+
+                    name =
+                        this.cleanText(
+                            title.text || ""
+                        );
+
+                    name =
+                        name
+                            .replace(
+                                /\s*-\s*BL\s*Novels.*$/i,
+                                ""
+                            )
+                            .trim();
+                }
+            }
+
+            const imageUrl =
+                this.getPageImage(doc);
+
+            return {
+                name: name,
+                imageUrl: imageUrl
+            };
+
+        } catch (e) {
+
+            return {
+                name: "",
+                imageUrl: ""
+            };
+        }
+    }
+
     async getNovelList(page) {
 
-        const currentPage = page || 1;
+        const currentPage =
+            page || 1;
 
-        let url = this.source.baseUrl + "/";
+        let url =
+            this.source.baseUrl + "/";
 
         if (currentPage > 1) {
             url =
@@ -247,84 +419,241 @@ class DefaultExtension extends MProvider {
                 "/";
         }
 
-        const doc = await this.fetchDocument(url);
+        const doc =
+            await this.fetchDocument(url);
 
         const result = [];
         const seen = {};
 
-        /*
-         * O BL Novels usa artigos/cards para
-         * apresentar as novelas.
-         */
-        const articles = doc.select("article");
-
-        for (let i = 0; i < articles.length; i++) {
-
-            const article = articles[i];
-
-            const links = article.select("a");
-
-            for (let j = 0; j < links.length; j++) {
-
-                const linkElement = links[j];
-
-                const href =
-                    linkElement.attr("href") || "";
-
-                const link = this.absoluteUrl(href);
-
-                if (!this.isNovelUrl(link)) {
-                    continue;
-                }
-
-                if (seen[link]) {
-                    continue;
-                }
-
-                let name =
-                    this.cleanText(
-                        linkElement.text || ""
-                    );
-
-                if (!name) {
-                    continue;
-                }
-
-                seen[link] = true;
-
-                const imageUrl =
-                    this.getImage(article);
-
-                result.push({
-                    name: name,
-                    link: link,
-                    imageUrl: imageUrl
-                });
-
-                break;
-            }
-        }
+        const articles =
+            doc.select("article");
 
         /*
-         * Caso o site mude o formato dos cards,
-         * fazemos uma segunda tentativa usando
-         * todos os links da página.
+         * Primeiro tentamos encontrar cada novel
+         * dentro do card.
          */
-        if (result.length === 0) {
+        for (
+            let i = 0;
+            i < articles.length;
+            i++
+        ) {
 
-            const links = doc.select("a");
+            const article =
+                articles[i];
 
-            for (let i = 0; i < links.length; i++) {
+            const links =
+                article.select("a");
 
-                const linkElement = links[i];
+            let novelLink = "";
+
+            /*
+             * Primeiro procura qualquer link
+             * que seja realmente /novel/nome/
+             */
+            for (
+                let j = 0;
+                j < links.length;
+                j++
+            ) {
 
                 const href =
-                    linkElement.attr("href") || "";
+                    links[j].attr("href") || "";
 
                 const link =
                     this.absoluteUrl(href);
 
-                if (!this.isNovelUrl(link)) {
+                if (
+                    this.isNovelUrl(link)
+                ) {
+                    novelLink = link;
+                    break;
+                }
+            }
+
+            if (!novelLink) {
+                continue;
+            }
+
+            if (seen[novelLink]) {
+                continue;
+            }
+
+            /*
+             * Agora procuramos o título.
+             *
+             * A ordem é importante:
+             * h3/h2/h4 normalmente contém
+             * o título da novel.
+             */
+            let name = "";
+
+            const titleSelectors = [
+                "h3 a",
+                "h2 a",
+                "h4 a",
+                ".post-title a",
+                ".item-summary h3 a",
+                ".item-summary h2 a",
+                ".post-title"
+            ];
+
+            for (
+                let j = 0;
+                j < titleSelectors.length;
+                j++
+            ) {
+
+                const titleElement =
+                    article.selectFirst(
+                        titleSelectors[j]
+                    );
+
+                if (!titleElement) {
+                    continue;
+                }
+
+                const candidate =
+                    this.cleanText(
+                        titleElement.text || ""
+                    );
+
+                if (
+                    candidate &&
+                    !this.isBadTitle(
+                        candidate
+                    )
+                ) {
+                    name = candidate;
+                    break;
+                }
+            }
+
+            /*
+             * Se não encontrou no título,
+             * procura o link da própria novel.
+             */
+            if (!name) {
+
+                for (
+                    let j = 0;
+                    j < links.length;
+                    j++
+                ) {
+
+                    const href =
+                        links[j].attr(
+                            "href"
+                        ) || "";
+
+                    const link =
+                        this.absoluteUrl(
+                            href
+                        );
+
+                    if (
+                        link !== novelLink
+                    ) {
+                        continue;
+                    }
+
+                    const candidate =
+                        this.cleanText(
+                            links[j].text || ""
+                        );
+
+                    if (
+                        candidate &&
+                        !this.isBadTitle(
+                            candidate
+                        )
+                    ) {
+                        name = candidate;
+                        break;
+                    }
+                }
+            }
+
+            /*
+             * A garantia final:
+             * busca o nome na página individual.
+             *
+             * Isso também resolve os cards em
+             * que o primeiro texto era "CONCLUÍDO",
+             * "EM ANDAMENTO" ou "18+".
+             */
+            let imageUrl =
+                this.getImageFromElement(
+                    article
+                );
+
+            if (
+                !name ||
+                this.isBadTitle(name) ||
+                !imageUrl
+            ) {
+
+                const info =
+                    await this.getNovelInfo(
+                        novelLink
+                    );
+
+                if (
+                    info.name &&
+                    !this.isBadTitle(
+                        info.name
+                    )
+                ) {
+                    name = info.name;
+                }
+
+                if (
+                    !imageUrl &&
+                    info.imageUrl
+                ) {
+                    imageUrl =
+                        info.imageUrl;
+                }
+            }
+
+            if (!name) {
+                continue;
+            }
+
+            seen[novelLink] = true;
+
+            result.push({
+                name: name,
+                link: novelLink,
+                imageUrl: imageUrl
+            });
+        }
+
+        /*
+         * Fallback caso a estrutura de article
+         * mude.
+         */
+        if (result.length === 0) {
+
+            const links =
+                doc.select("a");
+
+            for (
+                let i = 0;
+                i < links.length;
+                i++
+            ) {
+
+                const href =
+                    links[i].attr(
+                        "href"
+                    ) || "";
+
+                const link =
+                    this.absoluteUrl(href);
+
+                if (
+                    !this.isNovelUrl(link)
+                ) {
                     continue;
                 }
 
@@ -332,33 +661,41 @@ class DefaultExtension extends MProvider {
                     continue;
                 }
 
-                const name =
-                    this.cleanText(
-                        linkElement.text || ""
+                const info =
+                    await this.getNovelInfo(
+                        link
                     );
 
-                if (!name) {
+                if (!info.name) {
                     continue;
                 }
 
                 seen[link] = true;
 
                 result.push({
-                    name: name,
+                    name: info.name,
                     link: link,
-                    imageUrl: ""
+                    imageUrl: info.imageUrl
                 });
             }
         }
 
-        let hasNextPage = false;
+        let hasNextPage =
+            false;
 
-        const pageLinks = doc.select("a");
+        const pageLinks =
+            doc.select("a");
 
-        for (let i = 0; i < pageLinks.length; i++) {
+        for (
+            let i = 0;
+            i < pageLinks.length;
+            i++
+        ) {
 
             const href =
-                pageLinks[i].attr("href") || "";
+                pageLinks[i].attr(
+                    "href"
+                ) || "";
 
             const text =
                 this.cleanText(
@@ -377,7 +714,8 @@ class DefaultExtension extends MProvider {
             }
 
             if (
-                text === "posts mais antigos" ||
+                text ===
+                    "posts mais antigos" ||
                 text === "próxima" ||
                 text === "next"
             ) {
@@ -406,12 +744,15 @@ class DefaultExtension extends MProvider {
 
     async search(query, page, filters) {
 
-        const currentPage = page || 1;
+        const currentPage =
+            page || 1;
 
         let url =
             this.source.baseUrl +
             "/?s=" +
-            encodeURIComponent(query);
+            encodeURIComponent(
+                query
+            );
 
         if (currentPage > 1) {
             url +=
@@ -420,24 +761,33 @@ class DefaultExtension extends MProvider {
         }
 
         const doc =
-            await this.fetchDocument(url);
+            await this.fetchDocument(
+                url
+            );
 
         const result = [];
         const seen = {};
 
-        const links = doc.select("a");
+        const links =
+            doc.select("a");
 
-        for (let i = 0; i < links.length; i++) {
-
-            const linkElement = links[i];
+        for (
+            let i = 0;
+            i < links.length;
+            i++
+        ) {
 
             const href =
-                linkElement.attr("href") || "";
+                links[i].attr(
+                    "href"
+                ) || "";
 
             const link =
                 this.absoluteUrl(href);
 
-            if (!this.isNovelUrl(link)) {
+            if (
+                !this.isNovelUrl(link)
+            ) {
                 continue;
             }
 
@@ -445,21 +795,21 @@ class DefaultExtension extends MProvider {
                 continue;
             }
 
-            const name =
-                this.cleanText(
-                    linkElement.text || ""
+            const info =
+                await this.getNovelInfo(
+                    link
                 );
 
-            if (!name) {
+            if (!info.name) {
                 continue;
             }
 
             seen[link] = true;
 
             result.push({
-                name: name,
+                name: info.name,
                 link: link,
-                imageUrl: ""
+                imageUrl: info.imageUrl
             });
         }
 
@@ -472,7 +822,9 @@ class DefaultExtension extends MProvider {
     async getDetail(url) {
 
         const doc =
-            await this.fetchDocument(url);
+            await this.fetchDocument(
+                url
+            );
 
         let name = "";
 
@@ -489,13 +841,22 @@ class DefaultExtension extends MProvider {
         if (!name) {
 
             const title =
-                doc.selectFirst("title");
+                doc.selectFirst(
+                    "title"
+                );
 
             if (title) {
+
                 name =
                     this.cleanText(
                         title.text || ""
                     );
+
+                name =
+                    name.replace(
+                        /\s*-\s*BL\s*Novels.*$/i,
+                        ""
+                    ).trim();
             }
         }
 
@@ -520,7 +881,9 @@ class DefaultExtension extends MProvider {
                     descriptionSelectors[i]
                 );
 
-            if (!element) continue;
+            if (!element) {
+                continue;
+            }
 
             const text =
                 this.cleanText(
@@ -549,26 +912,36 @@ class DefaultExtension extends MProvider {
 
         /*
          * CAPÍTULOS
+         *
+         * Mantida a lógica que você confirmou
+         * estar funcionando na versão anterior.
          */
         const chapters = [];
         const seen = {};
 
-        const links = doc.select("a");
+        const links =
+            doc.select("a");
 
-        for (let i = 0; i < links.length; i++) {
-
-            const linkElement = links[i];
+        for (
+            let i = 0;
+            i < links.length;
+            i++
+        ) {
 
             const href =
-                linkElement.attr("href") || "";
+                links[i].attr(
+                    "href"
+                ) || "";
 
             const link =
                 this.absoluteUrl(href);
 
-            if (!this.isChapterUrl(
-                link,
-                url
-            )) {
+            if (
+                !this.isChapterUrl(
+                    link,
+                    url
+                )
+            ) {
                 continue;
             }
 
@@ -578,7 +951,7 @@ class DefaultExtension extends MProvider {
 
             const chapterName =
                 this.cleanText(
-                    linkElement.text || ""
+                    links[i].text || ""
                 );
 
             if (!chapterName) {
@@ -599,7 +972,8 @@ class DefaultExtension extends MProvider {
         return {
             name: name,
             link: url,
-            imageUrl: this.getNovelImage(doc),
+            imageUrl:
+                this.getPageImage(doc),
             description: description,
             author: author,
             genre: [
@@ -615,7 +989,9 @@ class DefaultExtension extends MProvider {
     async getHtmlContent(name, url) {
 
         const doc =
-            await this.fetchDocument(url);
+            await this.fetchDocument(
+                url
+            );
 
         const selectors = [
             ".reading-content",
@@ -635,7 +1011,9 @@ class DefaultExtension extends MProvider {
                     selectors[i]
                 );
 
-            if (!content) continue;
+            if (!content) {
+                continue;
+            }
 
             const text =
                 this.cleanText(
