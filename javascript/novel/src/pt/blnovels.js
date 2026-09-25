@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://blnovels.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.5",
+    "version": "0.1.6",
     "pkgPath": "novel/src/pt/blnovels.js",
     "notes": "Novels em português do BL Novels."
 }];
@@ -428,10 +428,6 @@ class DefaultExtension extends MProvider {
         const articles =
             doc.select("article");
 
-        /*
-         * Primeiro tentamos encontrar cada novel
-         * dentro do card.
-         */
         for (
             let i = 0;
             i < articles.length;
@@ -446,10 +442,6 @@ class DefaultExtension extends MProvider {
 
             let novelLink = "";
 
-            /*
-             * Primeiro procura qualquer link
-             * que seja realmente /novel/nome/
-             */
             for (
                 let j = 0;
                 j < links.length;
@@ -478,13 +470,6 @@ class DefaultExtension extends MProvider {
                 continue;
             }
 
-            /*
-             * Agora procuramos o título.
-             *
-             * A ordem é importante:
-             * h3/h2/h4 normalmente contém
-             * o título da novel.
-             */
             let name = "";
 
             const titleSelectors = [
@@ -528,10 +513,6 @@ class DefaultExtension extends MProvider {
                 }
             }
 
-            /*
-             * Se não encontrou no título,
-             * procura o link da própria novel.
-             */
             if (!name) {
 
                 for (
@@ -573,14 +554,6 @@ class DefaultExtension extends MProvider {
                 }
             }
 
-            /*
-             * A garantia final:
-             * busca o nome na página individual.
-             *
-             * Isso também resolve os cards em
-             * que o primeiro texto era "CONCLUÍDO",
-             * "EM ANDAMENTO" ou "18+".
-             */
             let imageUrl =
                 this.getImageFromElement(
                     article
@@ -628,10 +601,6 @@ class DefaultExtension extends MProvider {
             });
         }
 
-        /*
-         * Fallback caso a estrutura de article
-         * mude.
-         */
         if (result.length === 0) {
 
             const links =
@@ -750,9 +719,7 @@ class DefaultExtension extends MProvider {
         let url =
             this.source.baseUrl +
             "/?s=" +
-            encodeURIComponent(
-                query
-            );
+            encodeURIComponent(query);
 
         if (currentPage > 1) {
             url +=
@@ -860,39 +827,112 @@ class DefaultExtension extends MProvider {
             }
         }
 
+        /*
+         * SINOPSE
+         *
+         * O BL Novels possui uma seção
+         * chamada "Sinopse".
+         */
         let description = "";
 
-        const descriptionSelectors = [
-            ".summary_content",
-            ".description-summary",
-            ".summary",
-            ".description",
-            ".entry-content"
-        ];
+        const allElements =
+            doc.select(
+                "h1, h2, h3, h4, h5, h6, p, div"
+            );
+
+        let synopsisStarted = false;
+        const synopsisParts = [];
 
         for (
             let i = 0;
-            i < descriptionSelectors.length;
+            i < allElements.length;
             i++
         ) {
 
             const element =
-                doc.selectFirst(
-                    descriptionSelectors[i]
-                );
-
-            if (!element) {
-                continue;
-            }
+                allElements[i];
 
             const text =
                 this.cleanText(
                     element.text || ""
                 );
 
-            if (text.length > 30) {
-                description = text;
+            if (!text) {
+                continue;
+            }
+
+            const lower =
+                text.toLowerCase();
+
+            /*
+             * Início da sinopse.
+             */
+            if (
+                lower === "sinopse" ||
+                lower === "sinopse:"
+            ) {
+                synopsisStarted = true;
+                continue;
+            }
+
+            if (!synopsisStarted) {
+                continue;
+            }
+
+            /*
+             * Fim da sinopse.
+             */
+            if (
+                lower === "publicado por:" ||
+                lower === "publicado por" ||
+                lower === "últimos lançamentos" ||
+                lower === "ultimos lançamentos" ||
+                lower === "manga discussion" ||
+                lower === "tags:"
+            ) {
                 break;
+            }
+
+            /*
+             * Ignora títulos pequenos.
+             */
+            if (text.length < 20) {
+                continue;
+            }
+
+            /*
+             * Evita duplicação.
+             */
+            if (
+                synopsisParts.length === 0 ||
+                synopsisParts[
+                    synopsisParts.length - 1
+                ] !== text
+            ) {
+                synopsisParts.push(text);
+            }
+        }
+
+        if (synopsisParts.length > 0) {
+            description =
+                synopsisParts.join("\n\n");
+        }
+
+        /*
+         * Fallback para meta description.
+         */
+        if (!description) {
+
+            const meta =
+                doc.selectFirst(
+                    'meta[name="description"]'
+                );
+
+            if (meta) {
+                description =
+                    this.cleanText(
+                        meta.attr("content") || ""
+                    );
             }
         }
 
@@ -913,8 +953,8 @@ class DefaultExtension extends MProvider {
         /*
          * CAPÍTULOS
          *
-         * Mantida a lógica que você confirmou
-         * estar funcionando na versão anterior.
+         * Mantemos a lógica que já estava
+         * funcionando na versão anterior.
          */
         const chapters = [];
         const seen = {};
