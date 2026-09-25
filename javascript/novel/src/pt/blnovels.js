@@ -6,189 +6,173 @@ const mangayomiSources = [{
     "iconUrl": "https://blnovels.com/favicon.ico",
     "typeSource": "single",
     "itemType": 2,
-    "version": "0.1.3",
+    "version": "0.1.4",
     "pkgPath": "novel/src/pt/blnovels.js",
     "notes": "Novels em português do BL Novels."
 }];
 
 class DefaultExtension extends MProvider {
 
-    getHeaders(url) {
+    getHeaders() {
         return {
             "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-            "Referer": this.source.baseUrl + "/"
+            "Referer": "https://blnovels.com/"
         };
     }
 
-    absoluteUrl(href) {
-        if (!href) return "";
+    absoluteUrl(url) {
+        if (!url) return "";
 
-        href = href.trim();
+        url = url.trim();
 
-        if (href.startsWith("http://") ||
-            href.startsWith("https://")) {
-            return href;
+        if (url.indexOf("http://") === 0 ||
+            url.indexOf("https://") === 0) {
+            return url;
         }
 
-        if (href.startsWith("//")) {
-            return "https:" + href;
+        if (url.indexOf("//") === 0) {
+            return "https:" + url;
         }
 
-        if (href.startsWith("/")) {
-            return this.source.baseUrl + href;
+        if (url.indexOf("/") === 0) {
+            return this.source.baseUrl + url;
         }
 
-        return this.source.baseUrl + "/" + href;
+        return this.source.baseUrl + "/" + url;
     }
 
-    async fetch(url) {
-        const res = await new Client().get(
+    async fetchDocument(url) {
+        const client = new Client();
+
+        const response = await client.get(
             url,
-            this.getHeaders(url)
+            this.getHeaders()
         );
 
-        if (res.statusCode !== 200) {
+        if (response.statusCode !== 200) {
             throw new Error(
-                "BL Novels retornou HTTP " + res.statusCode
+                "BL Novels retornou HTTP " +
+                response.statusCode
             );
         }
 
-        return new Document(res.body);
+        return new Document(response.body);
     }
 
     cleanText(text) {
-        return (text || "")
+        if (!text) return "";
+
+        return text
             .replace(/\s+/g, " ")
             .trim();
     }
 
-    getMetaImage(doc) {
-        const selectors = [
-            'meta[property="og:image"]',
-            'meta[property="og:image:url"]',
-            'meta[name="twitter:image"]',
-            'meta[itemprop="image"]'
-        ];
-
-        for (const selector of selectors) {
-            const el = doc.selectFirst(selector);
-
-            if (el) {
-                const content = el.attr("content") || "";
-
-                if (content &&
-                    !content.includes("logo") &&
-                    !content.includes("favicon")) {
-                    return this.absoluteUrl(content);
-                }
-            }
-        }
-
-        return "";
-    }
-
-    getImageFromElement(element) {
+    getImage(element) {
         if (!element) return "";
 
         const img = element.selectFirst("img");
 
         if (!img) return "";
 
-        const attributes = [
-            "data-src",
-            "data-lazy-src",
-            "data-original",
-            "data-original-src",
-            "data-image",
-            "data-url",
-            "data-cfsrc",
-            "src"
-        ];
+        let url = "";
 
-        for (const attr of attributes) {
-            const value = img.attr(attr) || "";
+        url = img.attr("data-src") || "";
 
-            if (!value) continue;
-
-            if (
-                value.includes("logo") ||
-                value.includes("favicon") ||
-                value.includes("avatar")
-            ) {
-                continue;
-            }
-
-            return this.absoluteUrl(value);
+        if (!url) {
+            url = img.attr("data-lazy-src") || "";
         }
 
-        return "";
+        if (!url) {
+            url = img.attr("data-original") || "";
+        }
+
+        if (!url) {
+            url = img.attr("data-original-src") || "";
+        }
+
+        if (!url) {
+            url = img.attr("src") || "";
+        }
+
+        if (!url) return "";
+
+        const lower = url.toLowerCase();
+
+        if (lower.indexOf("logo") >= 0 ||
+            lower.indexOf("favicon") >= 0 ||
+            lower.indexOf("avatar") >= 0) {
+            return "";
+        }
+
+        return this.absoluteUrl(url);
     }
 
-    getPageImage(doc) {
+    getOpenGraphImage(doc) {
 
-        // Primeiro tenta OpenGraph
-        const metaImage = this.getMetaImage(doc);
+        const meta = doc.selectFirst(
+            'meta[property="og:image"]'
+        );
 
-        if (metaImage) {
-            return metaImage;
+        if (!meta) return "";
+
+        const value = meta.attr("content") || "";
+
+        if (!value) return "";
+
+        return this.absoluteUrl(value);
+    }
+
+    getNovelImage(doc) {
+
+        let image = this.getOpenGraphImage(doc);
+
+        if (image) {
+            return image;
         }
 
-        // Depois procura imagens comuns
         const selectors = [
             ".summary_image img",
-            ".tab-summary .summary_image img",
-            ".post-title .summary_image img",
+            ".tab-summary img",
             ".c-tabs-item__content img",
             ".page-item-detail img",
             ".item-summary img",
             "article img"
         ];
 
-        for (const selector of selectors) {
-            const img = doc.selectFirst(selector);
+        for (let i = 0; i < selectors.length; i++) {
+
+            const img = doc.selectFirst(
+                selectors[i]
+            );
 
             if (!img) continue;
 
-            const url =
-                img.attr("data-src") ||
-                img.attr("data-lazy-src") ||
-                img.attr("data-original") ||
-                img.attr("data-original-src") ||
-                img.attr("src") ||
-                "";
+            let url = "";
 
-            if (!url) continue;
+            url = img.attr("data-src") || "";
 
-            if (
-                url.includes("logo") ||
-                url.includes("favicon") ||
-                url.includes("avatar")
-            ) {
-                continue;
+            if (!url) {
+                url = img.attr("data-lazy-src") || "";
             }
 
-            return this.absoluteUrl(url);
-        }
+            if (!url) {
+                url = img.attr("data-original") || "";
+            }
 
-        // Último recurso: primeira imagem válida
-        for (const img of doc.select("img")) {
-
-            const url =
-                img.attr("data-src") ||
-                img.attr("data-lazy-src") ||
-                img.attr("data-original") ||
-                img.attr("data-original-src") ||
-                img.attr("src") ||
-                "";
+            if (!url) {
+                url = img.attr("src") || "";
+            }
 
             if (!url) continue;
 
+            const lower = url.toLowerCase();
+
             if (
-                url.includes("logo") ||
-                url.includes("favicon") ||
-                url.includes("avatar")
+                lower.indexOf("logo") >= 0 ||
+                lower.indexOf("favicon") >= 0 ||
+                lower.indexOf("avatar") >= 0
             ) {
                 continue;
             }
@@ -199,133 +183,203 @@ class DefaultExtension extends MProvider {
         return "";
     }
 
-    isNovelUrl(link) {
-        if (!link) return false;
+    isNovelUrl(url) {
 
-        if (!link.includes("/novel/")) {
+        if (!url) return false;
+
+        if (url.indexOf("/novel/") < 0) {
             return false;
         }
 
-        const part = link.split("/novel/")[1] || "";
+        const part = url.split("/novel/")[1] || "";
 
         const pieces = part
             .split("/")
-            .filter(x => x.trim() !== "");
+            .filter(function(item) {
+                return item.trim() !== "";
+            });
 
-        // Uma novela possui:
-        // /novel/nome-da-novel/
-        //
-        // Um capítulo possui:
-        // /novel/nome-da-novel/capitulo-1/
-        //
         return pieces.length === 1;
     }
 
-    isChapterOfNovel(link, novelUrl) {
-        if (!link || !novelUrl) return false;
+    isChapterUrl(url, novelUrl) {
+
+        if (!url || !novelUrl) {
+            return false;
+        }
 
         let base = novelUrl;
 
-        if (!base.endsWith("/")) {
+        if (base.charAt(base.length - 1) !== "/") {
             base += "/";
         }
 
-        if (!link.startsWith(base)) {
+        if (url.indexOf(base) !== 0) {
             return false;
         }
 
-        const remaining = link.substring(base.length);
+        const rest = url.substring(base.length);
 
-        if (!remaining) {
+        if (!rest) {
             return false;
         }
 
-        const pieces = remaining
+        const pieces = rest
             .split("/")
-            .filter(x => x.trim() !== "");
+            .filter(function(item) {
+                return item.trim() !== "";
+            });
 
-        return pieces.length >= 1;
+        return pieces.length > 0;
     }
 
     async getNovelList(page) {
 
-        const n = page || 1;
+        const currentPage = page || 1;
 
-        const url = n === 1
-            ? this.source.baseUrl + "/"
-            : this.source.baseUrl + "/page/" + n + "/";
+        let url = this.source.baseUrl + "/";
 
-        const doc = await this.fetch(url);
-
-        const list = [];
-        const seen = {};
-
-        for (const a of doc.select("a")) {
-
-            const href = a.attr("href") || "";
-            const link = this.absoluteUrl(href);
-
-            if (!this.isNovelUrl(link)) {
-                continue;
-            }
-
-            if (seen[link]) {
-                continue;
-            }
-
-            let name = this.cleanText(a.text || "");
-
-            if (!name) {
-                continue;
-            }
-
-            // Evita links que não são títulos de novelas
-            if (
-                name.toLowerCase() === "ler do início" ||
-                name.toLowerCase() === "último capítulo" ||
-                name.toLowerCase() === "ler"
-            ) {
-                continue;
-            }
-
-            seen[link] = true;
-
-            let imageUrl = this.getImageFromElement(a);
-
-            // Se a imagem não estiver no próprio link,
-            // tenta encontrar no elemento pai.
-            if (!imageUrl) {
-
-                const parent = a.parent();
-
-                if (parent) {
-                    imageUrl = this.getImageFromElement(parent);
-                }
-            }
-
-            list.push({
-                name: name,
-                link: link,
-                imageUrl: imageUrl
-            });
+        if (currentPage > 1) {
+            url =
+                this.source.baseUrl +
+                "/page/" +
+                currentPage +
+                "/";
         }
 
-        // Verifica próxima página
+        const doc = await this.fetchDocument(url);
+
+        const result = [];
+        const seen = {};
+
+        /*
+         * O BL Novels usa artigos/cards para
+         * apresentar as novelas.
+         */
+        const articles = doc.select("article");
+
+        for (let i = 0; i < articles.length; i++) {
+
+            const article = articles[i];
+
+            const links = article.select("a");
+
+            for (let j = 0; j < links.length; j++) {
+
+                const linkElement = links[j];
+
+                const href =
+                    linkElement.attr("href") || "";
+
+                const link = this.absoluteUrl(href);
+
+                if (!this.isNovelUrl(link)) {
+                    continue;
+                }
+
+                if (seen[link]) {
+                    continue;
+                }
+
+                let name =
+                    this.cleanText(
+                        linkElement.text || ""
+                    );
+
+                if (!name) {
+                    continue;
+                }
+
+                seen[link] = true;
+
+                const imageUrl =
+                    this.getImage(article);
+
+                result.push({
+                    name: name,
+                    link: link,
+                    imageUrl: imageUrl
+                });
+
+                break;
+            }
+        }
+
+        /*
+         * Caso o site mude o formato dos cards,
+         * fazemos uma segunda tentativa usando
+         * todos os links da página.
+         */
+        if (result.length === 0) {
+
+            const links = doc.select("a");
+
+            for (let i = 0; i < links.length; i++) {
+
+                const linkElement = links[i];
+
+                const href =
+                    linkElement.attr("href") || "";
+
+                const link =
+                    this.absoluteUrl(href);
+
+                if (!this.isNovelUrl(link)) {
+                    continue;
+                }
+
+                if (seen[link]) {
+                    continue;
+                }
+
+                const name =
+                    this.cleanText(
+                        linkElement.text || ""
+                    );
+
+                if (!name) {
+                    continue;
+                }
+
+                seen[link] = true;
+
+                result.push({
+                    name: name,
+                    link: link,
+                    imageUrl: ""
+                });
+            }
+        }
+
         let hasNextPage = false;
 
-        for (const a of doc.select("a")) {
+        const pageLinks = doc.select("a");
 
-            const href = a.attr("href") || "";
+        for (let i = 0; i < pageLinks.length; i++) {
 
-            const text = this.cleanText(
-                a.text || ""
-            ).toLowerCase();
+            const href =
+                pageLinks[i].attr("href") || "";
+
+            const text =
+                this.cleanText(
+                    pageLinks[i].text || ""
+                ).toLowerCase();
 
             if (
-                href.includes("/page/" + (n + 1) + "/") ||
-                text.includes("posts mais antigos") ||
-                text.includes("próxima") ||
-                text.includes("next")
+                href.indexOf(
+                    "/page/" +
+                    (currentPage + 1) +
+                    "/"
+                ) >= 0
+            ) {
+                hasNextPage = true;
+                break;
+            }
+
+            if (
+                text === "posts mais antigos" ||
+                text === "próxima" ||
+                text === "next"
             ) {
                 hasNextPage = true;
                 break;
@@ -333,7 +387,7 @@ class DefaultExtension extends MProvider {
         }
 
         return {
-            list: list,
+            list: result,
             hasNextPage: hasNextPage
         };
     }
@@ -352,26 +406,36 @@ class DefaultExtension extends MProvider {
 
     async search(query, page, filters) {
 
-        const n = page || 1;
+        const currentPage = page || 1;
 
         let url =
             this.source.baseUrl +
             "/?s=" +
             encodeURIComponent(query);
 
-        if (n > 1) {
-            url += "&paged=" + n;
+        if (currentPage > 1) {
+            url +=
+                "&paged=" +
+                currentPage;
         }
 
-        const doc = await this.fetch(url);
+        const doc =
+            await this.fetchDocument(url);
 
-        const list = [];
+        const result = [];
         const seen = {};
 
-        for (const a of doc.select("a")) {
+        const links = doc.select("a");
 
-            const href = a.attr("href") || "";
-            const link = this.absoluteUrl(href);
+        for (let i = 0; i < links.length; i++) {
+
+            const linkElement = links[i];
+
+            const href =
+                linkElement.attr("href") || "";
+
+            const link =
+                this.absoluteUrl(href);
 
             if (!this.isNovelUrl(link)) {
                 continue;
@@ -381,7 +445,10 @@ class DefaultExtension extends MProvider {
                 continue;
             }
 
-            const name = this.cleanText(a.text || "");
+            const name =
+                this.cleanText(
+                    linkElement.text || ""
+                );
 
             if (!name) {
                 continue;
@@ -389,73 +456,78 @@ class DefaultExtension extends MProvider {
 
             seen[link] = true;
 
-            let imageUrl = this.getImageFromElement(a);
-
-            if (!imageUrl) {
-
-                const parent = a.parent();
-
-                if (parent) {
-                    imageUrl = this.getImageFromElement(parent);
-                }
-            }
-
-            list.push({
+            result.push({
                 name: name,
                 link: link,
-                imageUrl: imageUrl
+                imageUrl: ""
             });
         }
 
         return {
-            list: list,
+            list: result,
             hasNextPage: false
         };
     }
 
     async getDetail(url) {
 
-        const doc = await this.fetch(url);
+        const doc =
+            await this.fetchDocument(url);
 
         let name = "";
 
-        const h1 = doc.selectFirst("h1");
+        const h1 =
+            doc.selectFirst("h1");
 
         if (h1) {
-            name = this.cleanText(h1.text);
+            name =
+                this.cleanText(
+                    h1.text || ""
+                );
         }
 
         if (!name) {
-            const title = doc.selectFirst("title");
+
+            const title =
+                doc.selectFirst("title");
 
             if (title) {
-                name = this.cleanText(title.text)
-                    .replace(/\s*-\s*BL Novels.*$/i, "");
+                name =
+                    this.cleanText(
+                        title.text || ""
+                    );
             }
         }
 
         let description = "";
 
         const descriptionSelectors = [
-            ".description-summary",
             ".summary_content",
+            ".description-summary",
             ".summary",
             ".description",
-            ".entry-content",
-            "article"
+            ".entry-content"
         ];
 
-        for (const selector of descriptionSelectors) {
+        for (
+            let i = 0;
+            i < descriptionSelectors.length;
+            i++
+        ) {
 
-            const el = doc.selectFirst(selector);
+            const element =
+                doc.selectFirst(
+                    descriptionSelectors[i]
+                );
 
-            if (!el) continue;
+            if (!element) continue;
 
-            const text = this.cleanText(
-                el.text || ""
-            );
+            const text =
+                this.cleanText(
+                    element.text || ""
+                );
 
-            if (text.length > 40) {
+            if (text.length > 30) {
                 description = text;
                 break;
             }
@@ -463,57 +535,40 @@ class DefaultExtension extends MProvider {
 
         let author = "";
 
-        const authorSelectors = [
-            ".author-content",
-            ".author",
-            ".summary_content .author"
-        ];
-
-        for (const selector of authorSelectors) {
-
-            const el = doc.selectFirst(selector);
-
-            if (!el) continue;
-
-            author = this.cleanText(
-                el.text || ""
+        const authorElement =
+            doc.selectFirst(
+                ".author-content"
             );
 
-            if (author) {
-                break;
-            }
+        if (authorElement) {
+            author =
+                this.cleanText(
+                    authorElement.text || ""
+                );
         }
 
         /*
          * CAPÍTULOS
-         *
-         * O BL Novels usa vários formatos:
-         *
-         * /novel/nome/capitulo-1/
-         * /novel/nome/capitulo-final/
-         * /novel/nome/volume-2/215/
-         *
-         * Portanto não vamos depender do texto
-         * "Capítulo".
          */
-
         const chapters = [];
         const seen = {};
 
-        let novelBase = url;
+        const links = doc.select("a");
 
-        if (!novelBase.endsWith("/")) {
-            novelBase += "/";
-        }
+        for (let i = 0; i < links.length; i++) {
 
-        for (const a of doc.select("a")) {
+            const linkElement = links[i];
 
-            const href = a.attr("href") || "";
-            const link = this.absoluteUrl(href);
+            const href =
+                linkElement.attr("href") || "";
 
-            if (!link) continue;
+            const link =
+                this.absoluteUrl(href);
 
-            if (!this.isChapterOfNovel(link, url)) {
+            if (!this.isChapterUrl(
+                link,
+                url
+            )) {
                 continue;
             }
 
@@ -521,32 +576,12 @@ class DefaultExtension extends MProvider {
                 continue;
             }
 
-            let chapterName = this.cleanText(
-                a.text || ""
-            );
+            const chapterName =
+                this.cleanText(
+                    linkElement.text || ""
+                );
 
             if (!chapterName) {
-                continue;
-            }
-
-            /*
-             * Ignora links de navegação que possam
-             * aparecer dentro da página.
-             */
-
-            const lower = chapterName.toLowerCase();
-
-            if (
-                lower === "home" ||
-                lower === "arquivo" ||
-                lower === "completas" ||
-                lower === "nacionais" ||
-                lower === "mais recentes" ||
-                lower === "a-z" ||
-                lower === "votos" ||
-                lower === "tendências" ||
-                lower === "mais vistas"
-            ) {
                 continue;
             }
 
@@ -559,16 +594,12 @@ class DefaultExtension extends MProvider {
             });
         }
 
-        /*
-         * O site normalmente apresenta do mais
-         * recente para o mais antigo.
-         */
         chapters.reverse();
 
         return {
             name: name,
             link: url,
-            imageUrl: this.getPageImage(doc),
+            imageUrl: this.getNovelImage(doc),
             description: description,
             author: author,
             genre: [
@@ -583,41 +614,48 @@ class DefaultExtension extends MProvider {
 
     async getHtmlContent(name, url) {
 
-        const doc = await this.fetch(url);
+        const doc =
+            await this.fetchDocument(url);
 
         const selectors = [
             ".reading-content",
-            ".chapter-content",
             ".entry-content",
             ".post-content",
-            ".content-area",
             "article"
         ];
 
-        for (const selector of selectors) {
+        for (
+            let i = 0;
+            i < selectors.length;
+            i++
+        ) {
 
-            const content = doc.selectFirst(selector);
+            const content =
+                doc.selectFirst(
+                    selectors[i]
+                );
 
-            if (!content) {
-                continue;
-            }
+            if (!content) continue;
 
-            const text = this.cleanText(
-                content.text || ""
-            );
+            const text =
+                this.cleanText(
+                    content.text || ""
+                );
 
             if (text.length > 100) {
                 return content.outerHtml;
             }
         }
 
-        const body = doc.selectFirst("body");
+        const body =
+            doc.selectFirst("body");
 
         if (body) {
 
-            const text = this.cleanText(
-                body.text || ""
-            );
+            const text =
+                this.cleanText(
+                    body.text || ""
+                );
 
             if (text.length > 100) {
                 return body.outerHtml;
@@ -631,41 +669,59 @@ class DefaultExtension extends MProvider {
 
     async cleanHtmlContent(html) {
 
-        const doc = new Document(html);
+        const doc =
+            new Document(html);
 
         const removeSelectors = [
             "script",
             "style",
             "noscript",
             "iframe",
-            "form",
-            ".comments",
-            ".comment-respond",
-            ".sharedaddy",
-            ".jp-relatedposts",
-            ".post-navigation",
-            ".navigation",
-            ".social-share"
+            "form"
         ];
 
-        for (const selector of removeSelectors) {
+        for (
+            let i = 0;
+            i < removeSelectors.length;
+            i++
+        ) {
 
-            for (const el of doc.select(selector)) {
-                el.remove();
+            const elements =
+                doc.select(
+                    removeSelectors[i]
+                );
+
+            for (
+                let j = 0;
+                j < elements.length;
+                j++
+            ) {
+                elements[j].remove();
             }
         }
 
-        const root =
-            doc.selectFirst(".reading-content") ||
-            doc.selectFirst(".chapter-content") ||
-            doc.selectFirst(".entry-content") ||
-            doc.selectFirst(".post-content") ||
-            doc.selectFirst("article") ||
-            doc.selectFirst("body");
+        const content =
+            doc.selectFirst(
+                ".reading-content"
+            ) ||
+            doc.selectFirst(
+                ".entry-content"
+            ) ||
+            doc.selectFirst(
+                ".post-content"
+            ) ||
+            doc.selectFirst(
+                "article"
+            ) ||
+            doc.selectFirst(
+                "body"
+            );
 
-        return root
-            ? root.outerHtml
-            : html;
+        if (content) {
+            return content.outerHtml;
+        }
+
+        return html;
     }
 
     getFilterList() {
