@@ -34,7 +34,7 @@
     "hasCloudflare": false,
     "sourceCodeUrl": "https://raw.githubusercontent.com/topografiat/mangayomi-novels-ptbr/main/javascript/novel/src/pt/blnovels.js",
     "apiUrl": "",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "isManga": false,
     "itemType": 2,
     "isFullData": false,
